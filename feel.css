@@ -1,0 +1,75 @@
+:root{--song-a:#ff4fa3;--song-b:#32d8ff}
+
+.screen{isolation:isolate}
+.game{overflow:hidden;transform:translateZ(0)}
+.game:after{content:"";position:absolute;inset:0;z-index:6;pointer-events:none;background:radial-gradient(circle at 50% 78%,transparent 0 34%,#02031655 76%,#020316aa 100%);mix-blend-mode:multiply}
+
+.lanes{overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none}
+.lane{overflow:hidden;touch-action:none;outline:none;transition:background .09s ease,filter .09s ease}
+.lane:before{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 16%,color-mix(in srgb,var(--song-b) 24%,transparent) 100%);opacity:0;transform:scaleY(.72);transform-origin:bottom;transition:opacity .12s ease,transform .12s ease}
+.lane.armed:before{opacity:.24;transform:scaleY(1)}
+.lane.pressed{background:linear-gradient(transparent 55%,color-mix(in srgb,var(--song-b) 38%,transparent));filter:brightness(1.18)}
+.lane.pressed:before{opacity:.75;transform:scaleY(1)}
+.lane b{z-index:2;transition:transform .075s cubic-bezier(.2,.9,.3,1),background .075s,box-shadow .075s}
+.lane.pressed b{transform:translateX(-50%) translateY(5px) scale(.93);background:#fff;color:#12153f;box-shadow:0 0 34px 9px var(--song-b)}
+.lane.empty-tap b{animation:keyReject .12s linear}
+.lane.hit-perfect:after{animation:judgeLinePerfect .25s ease-out}
+.lane.hit-good:after{animation:judgeLineGood .25s ease-out}
+
+.note{top:0!important;pointer-events:none;will-change:transform,opacity;contain:layout paint;overflow:visible;backface-visibility:hidden;letter-spacing:.04em;text-shadow:0 1px 4px #0008}
+.note span{position:relative;z-index:2}
+.note:before{content:"";position:absolute;left:12%;right:12%;bottom:70%;height:80px;z-index:-1;background:linear-gradient(transparent,currentColor);filter:blur(9px);opacity:.13;transform:perspective(90px) rotateX(24deg);transform-origin:bottom}
+.note:after{content:"";position:absolute;inset:3px;border-radius:10px;border:1px solid #ffffff55;box-shadow:inset 0 0 10px #fff4}
+.note.near{filter:brightness(1.2) saturate(1.2);box-shadow:0 0 32px 5px currentColor}
+
+.hit-flash{position:absolute;bottom:69px;width:6px;height:6px;z-index:10;pointer-events:none;border-radius:50%;background:#fff;box-shadow:0 0 8px 4px #fff,0 0 28px 12px var(--song-b);animation:hitCore .36s ease-out forwards}
+.hit-flash:before{content:"";position:absolute;left:50%;top:50%;width:34px;height:14px;border:3px solid #fff;border-radius:50%;transform:translate(-50%,-50%);box-shadow:0 0 15px var(--song-b);animation:hitRing .36s ease-out forwards}
+.hit-flash.good{opacity:.82;box-shadow:0 0 7px 3px #fff,0 0 20px 8px var(--song-b)}
+.hit-flash i{--angle:calc(var(--i)*45deg);position:absolute;left:2px;top:2px;width:3px;height:18px;border-radius:99px;background:linear-gradient(#fff,var(--song-a));box-shadow:0 0 7px var(--song-a);transform-origin:50% 2px;transform:rotate(var(--angle)) translateY(-8px);animation:particle .34s ease-out forwards}
+
+.judge{top:28%;z-index:14;min-width:280px;text-align:center;pointer-events:none;line-height:.9;filter:drop-shadow(0 0 12px currentColor)}
+.judge span{display:block;letter-spacing:.04em;-webkit-text-stroke:1px #fff8}
+.judge small{margin-top:9px;padding:5px 11px;border:1px solid #ffffff2f;border-radius:99px;background:#080b31bb;letter-spacing:.09em;text-shadow:none}
+.judge.PERFECT span{background:linear-gradient(180deg,#fff 0,#ffb4db 38%,#ff4fa3 100%);-webkit-background-clip:text;background-clip:text;color:transparent}
+.judge.GOOD span{background:linear-gradient(180deg,#fff 0,#9eefff 42%,#32d8ff 100%);-webkit-background-clip:text;background-clip:text;color:transparent}
+.judge.MISS{filter:none}
+
+.milestone{position:absolute;left:50%;top:18%;z-index:15;width:270px;padding:12px 20px;text-align:center;pointer-events:none;border:1px solid #ffffff75;border-radius:15px;background:linear-gradient(100deg,#ff4fa3dd,#6f42eadd,#32d8ffdd);box-shadow:0 0 35px #ff4fa388;transform:translateX(-50%);animation:milestone .88s cubic-bezier(.16,1,.3,1) forwards}
+.milestone small{display:block;font-size:9px;letter-spacing:.28em;color:#fffbd0}
+.milestone b{display:block;margin-top:2px;font-size:23px;font-style:italic}
+
+.game.impact{animation:impact .18s ease-out}
+.game.miss-pulse:before{content:"";position:absolute;inset:0;z-index:13;pointer-events:none;background:#ff315422;animation:missPulse .26s ease-out}
+.score-bump{animation:scoreBump .2s cubic-bezier(.16,1,.3,1)}
+.combo-bump{animation:comboBump .2s cubic-bezier(.16,1,.3,1)}
+.combo-hot strong{color:#fff;text-shadow:0 0 9px #fff,0 0 22px var(--song-a),0 0 38px var(--song-b)}
+.combo-hot p:after{content:" FEVER";color:#ff83bf;font-size:9px;letter-spacing:.12em}
+.energy i{transition:background .16s ease,box-shadow .16s ease,transform .16s ease}
+.energy i.on{transform:translateY(-2px)}
+
+.pause-layer{z-index:20!important;backdrop-filter:blur(8px);background:#070923c9!important}
+#resultPanel{backdrop-filter:blur(11px)}
+
+@keyframes keyReject{0%,100%{transform:translateX(-50%)}35%{transform:translateX(-56%)}70%{transform:translateX(-44%)}}
+@keyframes judgeLinePerfect{0%{transform:scaleX(.35);background:#fff;box-shadow:0 0 12px 3px #fff}100%{transform:scaleX(1);background:#fff;box-shadow:0 0 28px 12px var(--song-a)}}
+@keyframes judgeLineGood{0%{transform:scaleX(.45)}100%{transform:scaleX(1);box-shadow:0 0 22px 8px var(--song-b)}}
+@keyframes hitCore{0%{opacity:1;transform:translate(-50%,0) scale(.65)}70%{opacity:1}100%{opacity:0;transform:translate(-50%,0) scale(2.1)}}
+@keyframes hitRing{0%{opacity:1;transform:translate(-50%,-50%) scale(.25)}100%{opacity:0;transform:translate(-50%,-50%) scale(2.25)}}
+@keyframes particle{0%{opacity:1;transform:rotate(var(--angle)) translateY(-5px) scaleY(.45)}100%{opacity:0;transform:rotate(var(--angle)) translateY(-55px) scaleY(1)}}
+@keyframes milestone{0%{opacity:0;transform:translate(-50%,20px) scale(.78)}25%{opacity:1;transform:translate(-50%,0) scale(1.06)}70%{opacity:1;transform:translate(-50%,0) scale(1)}100%{opacity:0;transform:translate(-50%,-18px) scale(.96)}}
+@keyframes impact{0%,100%{transform:translate3d(0,0,0)}25%{transform:translate3d(-2px,1px,0)}50%{transform:translate3d(2px,-1px,0)}75%{transform:translate3d(-1px,-1px,0)}}
+@keyframes missPulse{from{opacity:1}to{opacity:0}}
+@keyframes scoreBump{0%{transform:scale(1)}45%{transform:scale(1.075);color:#fff}100%{transform:scale(1)}}
+@keyframes comboBump{0%{transform:scale(1)}45%{transform:scale(1.16)}100%{transform:scale(1)}}
+
+@media(max-width:640px){
+  .judge{top:31%;font-size:31px;min-width:220px}
+  .hit-flash{bottom:68px}
+  .milestone{top:17%;width:230px}
+  .lane:after{bottom:74px}
+}
+
+@media(prefers-reduced-motion:reduce){
+  .game.impact,.game.miss-pulse:before,.milestone,.hit-flash,.hit-flash:before,.hit-flash i{animation:none!important}
+  .hit-flash,.milestone{display:none!important}
+}
