@@ -9,3 +9,7 @@
 - 支持轻松、高能、鬼畜三档难度
 
 项目使用纯 HTML、CSS 和 JavaScript，无需安装依赖。GitHub Pages 会在推送到 `main` 后自动发布。
+
+## 在线体验
+
+https://jasmine521.github.io/bilibili-meme-arena/
