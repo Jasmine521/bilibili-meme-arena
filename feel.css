@@ -3,6 +3,22 @@
 .screen{isolation:isolate}
 .game{overflow:hidden;transform:translateZ(0)}
 .game:after{content:"";position:absolute;inset:0;z-index:6;pointer-events:none;background:radial-gradient(circle at 50% 78%,transparent 0 34%,#02031655 76%,#020316aa 100%);mix-blend-mode:multiply}
+.game.prewarming{pointer-events:none}
+
+.asset-loader{width:min(330px,78%);margin:4px 0 15px;padding:10px 12px;border:1px solid #4c5eaa;border-radius:12px;background:#080b31b8;box-shadow:inset 0 0 18px #17266588;transition:border-color .2s,box-shadow .2s}
+.asset-loader>span{display:flex;align-items:center;justify-content:space-between;margin-bottom:7px;color:#b8c4eb;font-size:10px;letter-spacing:.06em}
+.asset-loader>span b{font-weight:700}
+.asset-loader>span em{color:#71e8ff;font-style:normal;font-weight:900;font-variant-numeric:tabular-nums}
+.asset-loader>i{display:block;height:5px;overflow:hidden;border-radius:99px;background:#242d64}
+.asset-loader>i b{display:block;width:0;height:100%;border-radius:inherit;background:linear-gradient(90deg,var(--song-a),var(--song-b));box-shadow:0 0 12px var(--song-b);transition:width .16s ease}
+.asset-loader.loading>i b,.asset-loader.warming>i b{position:relative}
+.asset-loader.loading>i b:after,.asset-loader.warming>i b:after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent,#fff9,transparent);animation:loadShimmer 1.05s linear infinite}
+.asset-loader.ready{border-color:#42d6c5;box-shadow:inset 0 0 18px #1d8f7744,0 0 18px #32d8ff22}
+.asset-loader.ready>span em{color:#5dffcf}
+.asset-loader.error{border-color:#ff5e87;box-shadow:inset 0 0 18px #b81f5044}
+.asset-loader.error>span em{color:#ff83a4}
+.asset-loader.error>i b{background:linear-gradient(90deg,#8c2449,#ff5e87)}
+.start button:disabled{cursor:wait;filter:saturate(.6);opacity:.72;transform:none!important;box-shadow:0 4px 0 #5c2750,0 0 18px #7a4f7a55!important}
 
 .lanes{overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none}
 .lane{overflow:hidden;touch-action:none;outline:none;transition:background .09s ease,filter .09s ease}
@@ -61,15 +77,18 @@
 @keyframes missPulse{from{opacity:1}to{opacity:0}}
 @keyframes scoreBump{0%{transform:scale(1)}45%{transform:scale(1.075);color:#fff}100%{transform:scale(1)}}
 @keyframes comboBump{0%{transform:scale(1)}45%{transform:scale(1.16)}100%{transform:scale(1)}}
+@keyframes loadShimmer{from{transform:translateX(-120%)}to{transform:translateX(120%)}}
 
 @media(max-width:640px){
   .judge{top:31%;font-size:31px;min-width:220px}
   .hit-flash{bottom:68px}
   .milestone{top:17%;width:230px}
   .lane:after{bottom:74px}
+  .asset-loader{width:min(310px,86%);margin-bottom:12px}
 }
 
 @media(prefers-reduced-motion:reduce){
   .game.impact,.game.miss-pulse:before,.milestone,.hit-flash,.hit-flash:before,.hit-flash i{animation:none!important}
   .hit-flash,.milestone{display:none!important}
+  .asset-loader.loading>i b:after,.asset-loader.warming>i b:after{animation:none!important}
 }
