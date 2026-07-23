@@ -81,9 +81,9 @@
 
 @media(max-width:640px){
   .judge{top:31%;font-size:31px;min-width:220px}
-  .hit-flash{bottom:68px}
+  .hit-flash{bottom:62px}
   .milestone{top:17%;width:230px}
-  .lane:after{bottom:74px}
+  .lane:after{bottom:60px}
   .asset-loader{width:min(310px,86%);margin-bottom:12px}
 }
 
