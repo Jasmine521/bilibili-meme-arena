@@ -32,6 +32,13 @@ let raf=0;
 let countTimer=0;
 let lastSecond=-1;
 let audioContext=null;
+let assetLoadPromise=null;
+let assetAbort=null;
+let assetToken=0;
+let assetState='idle';
+let assetReadyIndex=-1;
+let assetBlobUrl='';
+let warmedSongIndex=-1;
 const heldKeys=new Set();
 
 const $=id=>document.getElementById(id);
@@ -84,22 +91,131 @@ function renderSongs(){
 }
 
 function selectSong(i){
-  if(['play','count','pause'].includes(phase))return;
+  if(['play','count','pause','loading'].includes(phase))return;
   music.pause();
   songIndex=i;
-  music.src=encodeURI(song().file);
-  music.load();
   document.documentElement.style.setProperty('--song-a',song().colors[0]);
   document.documentElement.style.setProperty('--song-b',song().colors[1]);
   renderSongs();
   syncSelected();
   updateHud(true);
+  preloadSong(i);
 }
 
 function syncSelected(){
   $('selectedTitle').innerHTML=`${song().title}<br><i>踩准节拍</i>`;
   $('selectedMeta').textContent=`♪ ${song().bpm} BPM · ${chart().length} NOTES · ${['轻松','高能','鬼畜'][difficulty]}`;
   $('playingTitle').textContent=`TRACK ${String(songIndex+1).padStart(2,'0')} · ${song().title}`;
+}
+
+function setAssetUi(state,progress=0,label=''){
+  assetState=state;
+  const loader=$('assetLoader');
+  const percent=Math.max(0,Math.min(100,Math.round(progress)));
+  loader.className='asset-loader '+state;
+  $('loadState').textContent=label||({loading:'正在缓存音频',ready:'资源准备完成',warming:'正在预热播放',error:'资源加载失败'}[state]||'正在准备资源');
+  $('loadPercent').textContent=state==='ready'?'READY':state==='error'?'RETRY':percent+'%';
+  $('loadBar').style.width=(state==='error'?100:percent)+'%';
+  const button=$('startBtn');
+  if(state==='ready'){
+    button.disabled=false;
+    button.textContent='开始演奏　▶';
+  }else if(state==='error'){
+    button.disabled=false;
+    button.textContent='重新加载　↻';
+  }else{
+    button.disabled=true;
+    button.textContent=state==='warming'?'启动节奏引擎…':`资源加载中　${percent}%`;
+  }
+}
+
+function waitForMediaReady(token){
+  if(music.readyState>=3)return Promise.resolve();
+  return new Promise((resolve,reject)=>{
+    const cleanup=()=>{
+      clearTimeout(timer);
+      music.removeEventListener('canplaythrough',ready);
+      music.removeEventListener('loadeddata',check);
+      music.removeEventListener('error',failed);
+    };
+    const ready=()=>{cleanup();resolve()};
+    const check=()=>{if(music.readyState>=3)ready()};
+    const failed=()=>{cleanup();reject(new Error('音频解码失败'))};
+    const timer=setTimeout(()=>{
+      cleanup();
+      if(token!==assetToken)return resolve();
+      music.readyState>=2?resolve():reject(new Error('音频准备超时'));
+    },12000);
+    music.addEventListener('canplaythrough',ready,{once:true});
+    music.addEventListener('loadeddata',check);
+    music.addEventListener('error',failed,{once:true});
+  });
+}
+
+async function readAudioResponse(response,token){
+  const total=Number(response.headers.get('content-length'))||0;
+  if(!response.body?.getReader){
+    const blob=await response.blob();
+    setAssetUi('loading',88,'正在校验音频');
+    return blob;
+  }
+  const reader=response.body.getReader();
+  const chunks=[];
+  let received=0;
+  while(true){
+    const {done,value}=await reader.read();
+    if(done)break;
+    if(token!==assetToken)throw new DOMException('已切换曲目','AbortError');
+    chunks.push(value);
+    received+=value.byteLength;
+    const progress=total?Math.min(88,received/total*88):Math.min(82,12+chunks.length*2);
+    setAssetUi('loading',progress,'正在缓存完整音频');
+  }
+  return new Blob(chunks,{type:response.headers.get('content-type')||'audio/mpeg'});
+}
+
+async function preloadSong(index){
+  const token=++assetToken;
+  assetAbort?.abort();
+  assetAbort=new AbortController();
+  assetReadyIndex=-1;
+  warmedSongIndex=-1;
+  setAssetUi('loading',2,'正在连接音频资源');
+  music.pause();
+  music.removeAttribute('src');
+  music.load();
+  if(assetBlobUrl){
+    URL.revokeObjectURL(assetBlobUrl);
+    assetBlobUrl='';
+  }
+  assetLoadPromise=(async()=>{
+    try{
+      const response=await fetch(encodeURI(SONGS[index].file),{
+        cache:'force-cache',
+        signal:assetAbort.signal
+      });
+      if(!response.ok)throw new Error(`音频请求失败 (${response.status})`);
+      const blob=await readAudioResponse(response,token);
+      if(token!==assetToken)return false;
+      setAssetUi('loading',92,'正在建立播放缓存');
+      assetBlobUrl=URL.createObjectURL(blob);
+      music.src=assetBlobUrl;
+      music.load();
+      await waitForMediaReady(token);
+      if(token!==assetToken)return false;
+      assetReadyIndex=index;
+      setAssetUi('ready',100,'音频与乐谱已就绪');
+      syncSelected();
+      return true;
+    }catch(error){
+      if(error.name==='AbortError'||token!==assetToken)return false;
+      console.error(error);
+      setAssetUi('error',100,'加载失败，请检查网络后重试');
+      $('selectedMeta').textContent='音频尚未准备完成，点击重新加载';
+      return false;
+    }
+  })();
+  return assetLoadPromise;
 }
 
 function clearNotes(){
@@ -129,25 +245,92 @@ function primeAudio(){
   audioContext?.resume?.();
 }
 
-function begin(){
+function nextPaint(){
+  return new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+}
+
+function waitForPlaybackAdvance(){
+  const startedAt=performance.now();
+  return new Promise((resolve,reject)=>{
+    const check=()=>{
+      if(music.currentTime>=.055)return resolve();
+      if(performance.now()-startedAt>1500)return reject(new Error('音频管线未能完成预热'));
+      requestAnimationFrame(check);
+    };
+    check();
+  });
+}
+
+function prepareFirstChartFrame(){
+  const approach=APPROACH_TIME[difficulty];
+  while(spawnCursor<notes.length&&notes[spawnCursor].t<=approach){
+    const note=notes[spawnCursor++];
+    if(!note.hit)createNote(note);
+  }
+  const root=$('lanes');
+  const startY=-58;
+  const hitY=Math.max(260,root.clientHeight-98);
+  activeNotes.forEach(note=>{
+    const progress=1-note.t/approach;
+    const y=startY+(hitY-startY)*progress;
+    note.el.style.transform=`translate3d(0,${y.toFixed(2)}px,0)`;
+  });
+}
+
+async function warmupPlayback(){
+  setAssetUi('warming',94,'正在预热音频解码');
+  music.currentTime=0;
+  music.volume=0;
+  const playPromise=music.play();
+  await playPromise;
+  await waitForPlaybackAdvance();
+  music.pause();
+  music.currentTime=0;
+  music.volume=muted?0:1;
+
+  setAssetUi('warming',98,'正在渲染首批音符');
+  reset();
+  show('gamePanel',true);
+  $('gamePanel').classList.add('prewarming');
+  prepareFirstChartFrame();
+  await nextPaint();
+  $('gamePanel').classList.remove('prewarming');
+  show('gamePanel',false);
+  warmedSongIndex=songIndex;
+}
+
+async function begin(){
+  if(['play','count','pause','loading'].includes(phase))return;
+  if(assetReadyIndex!==songIndex){
+    if(assetState!=='loading')preloadSong(songIndex);
+    return;
+  }
   clearInterval(countTimer);
   cancelAnimationFrame(raf);
-  reset();
   primeAudio();
-  phase='count';
-  show('startPanel',false);
+  phase='loading';
+  show('startPanel',true);
   show('resultPanel',false);
-  show('countPanel',true);
+  show('countPanel',false);
   show('gamePanel',false);
   lock(true);
-
-  music.volume=0;
-  music.play().then(()=>{
+  try{
+    if(warmedSongIndex!==songIndex)await warmupPlayback();
+    else reset();
+  }catch(error){
+    console.error(error);
     music.pause();
-    music.currentTime=0;
     music.volume=muted?0:1;
-  }).catch(()=>{music.volume=muted?0:1});
-
+    phase='ready';
+    lock(false);
+    setAssetUi('error',100,'播放预热失败，请点击重试');
+    $('selectedMeta').textContent='浏览器未能启动音频，请再次点击';
+    return;
+  }
+  phase='count';
+  setAssetUi('ready',100,'音频与乐谱已就绪');
+  show('startPanel',false);
+  show('countPanel',true);
   let count=3;
   pulseCount(String(count));
   countTimer=setInterval(()=>{
@@ -185,6 +368,7 @@ function startMusic(){
     show('gamePanel',false);
     show('startPanel',true);
     lock(false);
+    setAssetUi('error',100,'播放启动失败，请再次尝试');
     $('selectedMeta').textContent='音频播放被浏览器拦截，请再次点击开始';
   });
 }
@@ -505,7 +689,12 @@ document.addEventListener('visibilitychange',()=>{
 });
 
 music.addEventListener('error',()=>{
-  $('selectedMeta').textContent='音频加载失败，请刷新页面重试';
+  if(assetState!=='loading')$('selectedMeta').textContent='音频加载失败，请点击重新加载';
+});
+
+addEventListener('pagehide',()=>{
+  assetAbort?.abort();
+  if(assetBlobUrl)URL.revokeObjectURL(assetBlobUrl);
 });
 
 setupLanes();
