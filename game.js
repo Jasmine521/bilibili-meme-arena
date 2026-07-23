@@ -1,21 +1,14 @@
-const extraStyle=document.createElement('link');
-extraStyle.rel='stylesheet';
-extraStyle.href='songs.css';
-document.head.appendChild(extraStyle);
-
-const feelStyle=document.createElement('link');
-feelStyle.rel='stylesheet';
-feelStyle.href='feel.css';
-document.head.appendChild(feelStyle);
-
 const lanes=[['D','前方高能'],['F','名场面'],['J','下次一定'],['K','好耶！']];
 const diffKeys=['easy','normal','hard'];
-const PERFECT_WINDOW=72;
-const EARLY_WINDOW=178;
-const LATE_WINDOW=188;
-const APPROACH_TIME=[2350,2100,1880];
+const DIFFICULTIES=[
+  {name:'进阶',level:'LV.5',perfect:75,early:165,late:175,source:'normal'},
+  {name:'高能',level:'LV.8',perfect:58,early:135,late:145,source:'hard'},
+  {name:'鬼畜',level:'LV.11',perfect:45,early:105,late:115,source:'hard'}
+];
+const APPROACH_TIME=[2050,1680,1380];
+const chartCache=new Map();
 
-let difficulty=1;
+let difficulty=0;
 let songIndex=0;
 let phase='ready';
 let notes=[];
@@ -39,14 +32,59 @@ let assetState='idle';
 let assetReadyIndex=-1;
 let assetBlobUrl='';
 let warmedSongIndex=-1;
+let openDrawerId='';
+let drawerPausedGame=false;
+let drawerReturnFocus=null;
 const heldKeys=new Set();
 
 const $=id=>document.getElementById(id);
 const music=$('music');
 const show=(id,on)=>$(id).classList.toggle('hidden',!on);
 const song=()=>SONGS[songIndex];
-const chart=()=>song().charts[diffKeys[difficulty]];
+const chart=()=>enhancedChart(song(),difficulty);
 const now=()=>music.currentTime*1000+(+(localStorage.rhythmOffset||0));
+
+function enhancedChart(targetSong,level){
+  const key=`${targetSong.id}_${level}`;
+  if(chartCache.has(key))return chartCache.get(key);
+  const spec=DIFFICULTIES[level];
+  const source=targetSong.charts[spec.source].map(note=>[note[0],note[1]]);
+  if(level===0){
+    chartCache.set(key,source);
+    return source;
+  }
+
+  const additions=[];
+  for(let i=0;i<source.length-1;i++){
+    const current=source[i];
+    const next=source[i+1];
+    const gap=next[0]-current[0];
+    const shouldSplit=level===1
+      ? gap>=380&&gap<=610&&i%2===0
+      : gap>=250&&gap<=620;
+    if(shouldSplit){
+      const time=Math.round((current[0]+next[0])/2);
+      const lane=(current[1]+(i%2?1:3))%4;
+      if(lane!==next[1])additions.push([time,lane]);
+    }
+    const chordEvery=level===1?13:7;
+    if(i>5&&i%chordEvery===0){
+      additions.push([current[0],(current[1]+2+(i%2))%4]);
+    }
+  }
+
+  const seen=new Set();
+  const result=[...source,...additions]
+    .sort((a,b)=>a[0]-b[0]||a[1]-b[1])
+    .filter(note=>{
+      const noteKey=note[0]+'_'+note[1];
+      if(seen.has(noteKey))return false;
+      seen.add(noteKey);
+      return true;
+    });
+  chartCache.set(key,result);
+  return result;
+}
 
 function setupLanes(){
   const root=$('lanes');
@@ -80,18 +118,27 @@ function renderSongs(){
   const list=$('songList');
   list.innerHTML='';
   SONGS.forEach((s,i)=>{
+    const noteCount=enhancedChart(s,difficulty).length;
     const card=document.createElement('button');
     card.className='song-card'+(i===songIndex?' selected':'');
     card.style.setProperty('--a',s.colors[0]);
     card.style.setProperty('--b',s.colors[1]);
-    card.innerHTML=`<span class="disc"><i>♫</i></span><span class="song-copy"><small>TRACK ${String(i+1).padStart(2,'0')}</small><strong>${s.title}</strong><em>${s.subtitle}</em><span class="tags"><i>${s.bpm} BPM</i><i>${Math.floor(s.duration/60)}:${String(Math.round(s.duration%60)).padStart(2,'0')}</i><i>${s.charts.normal.length} NOTES</i></span></span><b class="pick">${i===songIndex?'已选择':'选择'}</b>`;
-    card.onclick=()=>selectSong(i);
+    card.innerHTML=`<span class="disc"><i>♫</i></span><span class="song-copy"><small>TRACK ${String(i+1).padStart(2,'0')}</small><strong>${s.title}</strong><em>${s.subtitle}</em><span class="tags"><i>${s.bpm} BPM</i><i>${Math.floor(s.duration/60)}:${String(Math.round(s.duration%60)).padStart(2,'0')}</i><i>${noteCount} NOTES</i></span></span><b class="pick">${i===songIndex?'已选择':'选择'}</b>`;
+    card.onclick=()=>{
+      selectSong(i);
+      closeDrawers();
+    };
     list.appendChild(card);
   });
 }
 
 function selectSong(i){
   if(['play','count','pause','loading'].includes(phase))return;
+  if(i===songIndex&&assetState==='loading')return;
+  if(i===songIndex&&assetReadyIndex===i){
+    syncSelected();
+    return;
+  }
   music.pause();
   songIndex=i;
   document.documentElement.style.setProperty('--song-a',song().colors[0]);
@@ -103,9 +150,15 @@ function selectSong(i){
 }
 
 function syncSelected(){
+  const spec=DIFFICULTIES[difficulty];
   $('selectedTitle').innerHTML=`${song().title}<br><i>踩准节拍</i>`;
-  $('selectedMeta').textContent=`♪ ${song().bpm} BPM · ${chart().length} NOTES · ${['轻松','高能','鬼畜'][difficulty]}`;
+  $('selectedMeta').textContent=`♪ ${song().bpm} BPM · ${chart().length} NOTES · ${spec.name}`;
   $('playingTitle').textContent=`TRACK ${String(songIndex+1).padStart(2,'0')} · ${song().title}`;
+  $('topSongTitle').textContent=song().title;
+  $('topSongMeta').textContent=`${song().bpm} BPM · ${spec.name}`;
+  $('stageSongTitle').textContent=song().title;
+  $('difficultyLabel').textContent=`${spec.name} · ${spec.level}`;
+  $('stageMeta').textContent=`${song().bpm} BPM · ${chart().length} NOTES`;
 }
 
 function setAssetUi(state,progress=0,label=''){
@@ -116,6 +169,8 @@ function setAssetUi(state,progress=0,label=''){
   $('loadState').textContent=label||({loading:'正在缓存音频',ready:'资源准备完成',warming:'正在预热播放',error:'资源加载失败'}[state]||'正在准备资源');
   $('loadPercent').textContent=state==='ready'?'READY':state==='error'?'RETRY':percent+'%';
   $('loadBar').style.width=(state==='error'?100:percent)+'%';
+  $('resourcePill').className='resource-pill '+state;
+  $('resourcePill').textContent=state==='ready'?'资源 READY':state==='error'?'资源异常':state==='warming'?'引擎预热中':`加载 ${percent}%`;
   const button=$('startBtn');
   if(state==='ready'){
     button.disabled=false;
@@ -249,6 +304,13 @@ function nextPaint(){
   return new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
 }
 
+function noteHitY(root){
+  const mobile=innerWidth<=760;
+  const lineBottom=mobile?60:67;
+  const noteHeight=mobile?40:44;
+  return Math.max(120,root.clientHeight-lineBottom-noteHeight/2-2);
+}
+
 function waitForPlaybackAdvance(){
   const startedAt=performance.now();
   return new Promise((resolve,reject)=>{
@@ -269,7 +331,7 @@ function prepareFirstChartFrame(){
   }
   const root=$('lanes');
   const startY=-58;
-  const hitY=Math.max(260,root.clientHeight-98);
+  const hitY=noteHitY(root);
   activeNotes.forEach(note=>{
     const progress=1-note.t/approach;
     const y=startY+(hitY-startY)*progress;
@@ -301,6 +363,10 @@ async function warmupPlayback(){
 
 async function begin(){
   if(['play','count','pause','loading'].includes(phase))return;
+  if(openDrawerId){
+    closeDrawers();
+    return;
+  }
   if(assetReadyIndex!==songIndex){
     if(assetState!=='loading')preloadSong(songIndex);
     return;
@@ -400,6 +466,7 @@ function retireNote(note,state){
 
 function hit(laneIndex){
   if(phase!=='play')return;
+  const windows=DIFFICULTIES[difficulty];
   const time=now();
   let candidate=null;
   let closest=Infinity;
@@ -411,9 +478,9 @@ function hit(laneIndex){
 
   if(!candidate)return emptyTap(laneIndex);
   const delta=time-candidate.t;
-  if(delta < -EARLY_WINDOW || delta > LATE_WINDOW)return emptyTap(laneIndex);
+  if(delta < -windows.early || delta > windows.late)return emptyTap(laneIndex);
 
-  const isPerfect=Math.abs(delta)<=PERFECT_WINDOW;
+  const isPerfect=Math.abs(delta)<=windows.perfect;
   retireNote(candidate,'hit');
   if(isPerfect)perfect++;else good++;
   combo++;
@@ -505,9 +572,10 @@ function milestone(value){
 }
 
 function markMisses(time){
+  const lateWindow=DIFFICULTIES[difficulty].late;
   const missed=[];
   activeNotes.forEach(note=>{
-    if(!note.hit&&time-note.t>LATE_WINDOW)missed.push(note);
+    if(!note.hit&&time-note.t>lateWindow)missed.push(note);
   });
   if(!missed.length)return;
   missed.forEach(note=>{
@@ -536,7 +604,7 @@ function loop(){
   markMisses(time);
   const root=$('lanes');
   const startY=-58;
-  const hitY=Math.max(260,root.clientHeight-98);
+  const hitY=noteHitY(root);
   const armed=new Set();
   activeNotes.forEach(note=>{
     if(note.hit||!note.el)return;
@@ -563,7 +631,7 @@ function energyValue(){
   return Math.min(100,Math.round((perfect+good*.55)/Math.max(1,chart().length)*115));
 }
 
-function bestKey(){return `best_${song().id}_${diffKeys[difficulty]}`}
+function bestKey(){return `best_v2_${song().id}_${diffKeys[difficulty]}`}
 
 function bump(node,className){
   node.classList.remove(className);
@@ -614,6 +682,7 @@ function finish(){
   $('finalScore').textContent=score.toLocaleString();
   $('accuracy').textContent=accuracy+'%';
   $('maxCombo').textContent=maxCombo;
+  renderRecords();
   $('resultPanel').animate([
     {opacity:0,transform:'translateY(22px) scale(.94)'},
     {opacity:1,transform:'translateY(0) scale(1)'}
@@ -636,6 +705,74 @@ function togglePause(){
   }
 }
 
+function renderRecords(){
+  const root=$('recordsList');
+  if(!root)return;
+  root.innerHTML=SONGS.map((item,index)=>{
+    const scores=diffKeys.map(key=>(+(localStorage[`best_v2_${item.id}_${key}`]||0)).toLocaleString());
+    return `<article class="record-row"><div><small>TRACK ${String(index+1).padStart(2,'0')}</small><b>${item.title}</b></div>${scores.map((value,i)=>`<span><b>${value}</b>${DIFFICULTIES[i].name}</span>`).join('')}</article>`;
+  }).join('');
+}
+
+function setDrawerButtons(id){
+  document.querySelectorAll('[data-open]').forEach(button=>{
+    button.classList.toggle('active',button.dataset.open===id);
+  });
+}
+
+function openDrawer(id,opener=null){
+  if(['count','loading'].includes(phase))return;
+  if(openDrawerId===id){
+    closeDrawers();
+    return;
+  }
+  if(phase==='play'){
+    togglePause();
+    drawerPausedGame=true;
+  }
+  document.querySelectorAll('.drawer').forEach(drawer=>{
+    const isTarget=drawer.id===id;
+    drawer.classList.toggle('open',isTarget);
+    drawer.setAttribute('aria-hidden',String(!isTarget));
+    drawer.inert=!isTarget;
+  });
+  $('drawerBackdrop').classList.add('open');
+  openDrawerId=id;
+  drawerReturnFocus=opener||document.activeElement;
+  setDrawerButtons(id);
+  if(id==='recordsDrawer')renderRecords();
+  requestAnimationFrame(()=>$(`${id}`)?.querySelector('[data-close]')?.focus({preventScroll:true}));
+}
+
+function closeDrawers(){
+  if(!openDrawerId)return;
+  document.querySelectorAll('.drawer').forEach(drawer=>{
+    drawer.classList.remove('open');
+    drawer.setAttribute('aria-hidden','true');
+    drawer.inert=true;
+  });
+  $('drawerBackdrop').classList.remove('open');
+  openDrawerId='';
+  setDrawerButtons('');
+  drawerReturnFocus?.focus?.({preventScroll:true});
+  drawerReturnFocus=null;
+  if(drawerPausedGame&&phase==='pause'){
+    drawerPausedGame=false;
+    setTimeout(()=>{if(phase==='pause'&&!openDrawerId)togglePause()},180);
+  }else{
+    drawerPausedGame=false;
+  }
+}
+
+function setupDrawers(){
+  document.querySelectorAll('.drawer').forEach(drawer=>drawer.inert=true);
+  document.querySelectorAll('[data-open]').forEach(button=>{
+    button.addEventListener('click',()=>openDrawer(button.dataset.open,button));
+  });
+  document.querySelectorAll('[data-close]').forEach(button=>button.addEventListener('click',closeDrawers));
+  $('drawerBackdrop').addEventListener('click',closeDrawers);
+}
+
 function lock(on){
   document.querySelectorAll('[data-diff],.song-card').forEach(button=>button.disabled=on);
 }
@@ -644,8 +781,11 @@ document.querySelectorAll('[data-diff]').forEach(button=>{
   button.onclick=()=>{
     difficulty=+button.dataset.diff;
     document.querySelectorAll('[data-diff]').forEach(item=>item.classList.toggle('on',item===button));
+    warmedSongIndex=-1;
+    renderSongs();
     syncSelected();
     updateHud(true);
+    closeDrawers();
   };
 });
 
@@ -660,6 +800,11 @@ $('mute').onclick=()=>{
 
 addEventListener('keydown',event=>{
   const key=event.key.toUpperCase();
+  if(event.key==='Escape'&&openDrawerId){
+    event.preventDefault();
+    closeDrawers();
+    return;
+  }
   const laneIndex=lanes.findIndex(item=>item[0]===key);
   if(laneIndex>=0){
     event.preventDefault();
@@ -668,7 +813,7 @@ addEventListener('keydown',event=>{
     pressLane(laneIndex,true);
     hit(laneIndex);
   }
-  if(event.key===' '&&(phase==='ready'||phase==='result')){
+  if(event.key===' '&&!openDrawerId&&(phase==='ready'||phase==='result')){
     event.preventDefault();
     begin();
   }
@@ -698,5 +843,7 @@ addEventListener('pagehide',()=>{
 });
 
 setupLanes();
+setupDrawers();
+renderRecords();
 renderSongs();
 selectSong(0);

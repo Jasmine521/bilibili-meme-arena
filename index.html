@@ -1,11 +1,210 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#070b2b"><title>哔梗节拍研究所</title><link rel="stylesheet" href="style.css"></head><body>
-<main><div class="stars"></div><header><a class="brand" href="#top"><i>▶</i><b>〰 哔梗能量站</b></a><nav><a href="#game">音游挑战</a><a href="#rules">玩法说明</a><a href="#lab">梗能研究所</a></nav><div class="head-actions"><span>● 活动进行中</span><button id="mute" aria-label="声音开关">♫</button><em>⚡ Lv.8 研究员</em></div></header>
-<section class="hero" id="top"><div><p>BILIBILITOY · AI 创造公开赛</p><h1>哔梗节拍研究所</h1><small>四首名作，四套鼓点谱面。选歌，上场，让热梗踩准节拍。</small></div><div class="difficulty"><button data-diff="0">轻松</button><button class="on" data-diff="1">高能</button><button data-diff="2">鬼畜</button></div></section>
-<section class="song-section" aria-labelledby="songTitle"><div class="section-title"><div><p>SELECT TRACK</p><h2 id="songTitle">选择挑战曲目</h2></div><span>← 横向滑动查看更多 →</span></div><div class="song-list" id="songList"></div></section>
-<section class="layout" id="game"><div class="machine"><div class="machine-title">● ● ●　 <b>梗 能 量 研 究 所</b>　 ● ● ●</div><div class="screen">
-<div class="start" id="startPanel"><span id="selectedMeta">♪ 四轨节奏实验</span><h2 id="selectedTitle">选择曲目<br><i>踩准节拍</i></h2><p>D · F · J · K 四键出击<br>谱面已按原曲鼓点生成</p><div class="asset-loader" id="assetLoader" role="status" aria-live="polite"><span><b id="loadState">正在准备资源</b><em id="loadPercent">0%</em></span><i><b id="loadBar"></b></i></div><button id="startBtn" disabled>资源加载中　0%</button></div>
-<div class="count hidden" id="countPanel"><b id="countText">3</b><p>能量同步中</p></div>
-<div class="game hidden" id="gamePanel"><div class="track-head"><span id="playingTitle">TRACK 01</span><span><button id="pauseBtn">Ⅱ</button>　<b id="time">0s</b></span></div><div class="lanes" id="lanes"></div><div class="judge" id="judge"></div><div class="pause-layer hidden" id="pauseLayer"><b>已暂停</b><small>按 P 或点击继续</small></div></div>
-<div class="result hidden" id="resultPanel"><p>实验完成</p><h2 id="rank">高 能</h2><div><span><b id="finalScore">0</b>得分</span><span><b id="accuracy">0%</b>准确率</span><span><b id="maxCombo">0</b>最高连击</span></div><button id="replayBtn">再来一局　↻</button></div><div class="progress"><i id="progress"></i></div></div></div>
-<aside><section><p>实时得分 〰</p><strong id="score">000000</strong><small>本机最高　<b id="best">0</b></small></section><section><p>梗能量 〰</p><div class="energy" id="energy"></div><h3 id="energyText">⚡ 0 / 24</h3><small id="energyHint">再积攒 50 个节拍充满能量</small></section><section class="combo"><p>COMBO</p><strong id="combo">0</strong><div><span><b id="perfect">0</b>PERFECT</span><span><b id="good">0</b>GOOD</span><span><b id="miss">0</b>MISS</span></div></section></aside></section>
-<section class="cards" id="rules"><article><i>⌨</i><div><p>玩法说明</p><h3>四键接梗，节拍判定</h3><small>音符抵达判定线时按下 D F J K，越准能量越高。</small></div></article><article><i>♫</i><div><p>真实鼓点谱面</p><h3>按每首原曲独立分析</h3><small>谱面来自音频瞬态与节奏峰值，不再使用固定节拍。</small></div></article><article id="lab"><i>✦</i><div><p>本地记录</p><h3>每首歌独立保存最高分</h3><small>切换曲目和难度，挑战属于你的梗王纪录。</small></div></article></section><footer>本作品为 AI 创造公开赛互动原型 · 热梗仅作文化创意演绎</footer></main><audio id="music" preload="auto" playsinline></audio><script src="songs.js"></script><script src="game.js"></script></body></html>
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#070b2b">
+  <title>哔梗节拍研究所</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="songs.css">
+  <link rel="stylesheet" href="feel.css">
+</head>
+<body>
+  <main class="app-shell">
+    <div class="stars"></div>
+
+    <header class="topbar">
+      <button class="brand" type="button" data-open="tracksDrawer" aria-label="打开曲库">
+        <i>▶</i>
+        <span><b>哔梗节拍</b><small>BILIBILITOY LAB</small></span>
+      </button>
+
+      <div class="now-playing">
+        <small>NOW CHALLENGING</small>
+        <b id="topSongTitle">下个，大狗，叫</b>
+        <span id="topSongMeta">99 BPM · 进阶</span>
+      </div>
+
+      <nav class="topnav" aria-label="游戏控制">
+        <button type="button" data-open="tracksDrawer">曲库</button>
+        <button type="button" data-open="difficultyDrawer">难度</button>
+        <button type="button" data-open="rulesDrawer">玩法</button>
+        <button type="button" data-open="recordsDrawer">记录</button>
+      </nav>
+
+      <div class="top-actions">
+        <span class="resource-pill" id="resourcePill">资源准备中</span>
+        <button id="mute" type="button" aria-label="声音开关">♫</button>
+        <em>⚡ LV.8</em>
+      </div>
+    </header>
+
+    <section class="play-shell">
+      <aside class="tool-rail rail-left" aria-label="挑战设置">
+        <button type="button" data-open="tracksDrawer"><i>♫</i><span>曲库</span></button>
+        <button type="button" data-open="difficultyDrawer"><i>⚡</i><span>难度</span></button>
+      </aside>
+
+      <section class="stage-area" id="game">
+        <div class="stage-head">
+          <div>
+            <span>BILIBILITOY · AI 创造公开赛</span>
+            <h1 id="stageSongTitle">下个，大狗，叫</h1>
+          </div>
+          <div class="stage-chips">
+            <b id="difficultyLabel">进阶 · LV.5</b>
+            <small id="stageMeta">99 BPM · 四轨节奏实验</small>
+          </div>
+        </div>
+
+        <section class="game-layout">
+          <div class="machine">
+            <div class="machine-title"><span>● ● ●</span><b>梗 能 量 研 究 所</b><span>● ● ●</span></div>
+            <div class="screen">
+              <div class="start" id="startPanel">
+                <span id="selectedMeta">♪ 四轨节奏实验</span>
+                <h2 id="selectedTitle">选择曲目<br><i>踩准节拍</i></h2>
+                <p>D · F · J · K 四键出击<br>本轮谱面已全面提升强度</p>
+                <div class="asset-loader" id="assetLoader" role="status" aria-live="polite">
+                  <span><b id="loadState">正在准备资源</b><em id="loadPercent">0%</em></span>
+                  <i><b id="loadBar"></b></i>
+                </div>
+                <button id="startBtn" type="button" disabled>资源加载中　0%</button>
+              </div>
+
+              <div class="count hidden" id="countPanel">
+                <b id="countText">3</b>
+                <p>能量同步中</p>
+              </div>
+
+              <div class="game hidden" id="gamePanel">
+                <div class="track-head">
+                  <span id="playingTitle">TRACK 01</span>
+                  <span><button id="pauseBtn" type="button" aria-label="暂停">Ⅱ</button><b id="time">0s</b></span>
+                </div>
+                <div class="lanes" id="lanes"></div>
+                <div class="judge" id="judge"></div>
+                <div class="pause-layer hidden" id="pauseLayer">
+                  <b>已暂停</b>
+                  <small>按 P 或点击继续</small>
+                </div>
+              </div>
+
+              <div class="result hidden" id="resultPanel">
+                <p>实验完成</p>
+                <h2 id="rank">高 能</h2>
+                <div>
+                  <span><b id="finalScore">0</b>得分</span>
+                  <span><b id="accuracy">0%</b>准确率</span>
+                  <span><b id="maxCombo">0</b>最高连击</span>
+                </div>
+                <button id="replayBtn" type="button">再来一局　↻</button>
+              </div>
+
+              <div class="progress"><i id="progress"></i></div>
+            </div>
+          </div>
+
+          <aside class="hud-panel">
+            <section class="score-card">
+              <p>实时得分 <i>LIVE</i></p>
+              <strong id="score">000000</strong>
+              <small>本机最高　<b id="best">0</b></small>
+            </section>
+            <section class="energy-card">
+              <p>梗能量 <i>CHARGE</i></p>
+              <div class="energy" id="energy"></div>
+              <h3 id="energyText">⚡ 0 / 24</h3>
+              <small id="energyHint">保持节奏，激活研究增益</small>
+            </section>
+            <section class="combo-card">
+              <p>COMBO</p>
+              <strong id="combo">0</strong>
+              <div>
+                <span><b id="perfect">0</b>PERFECT</span>
+                <span><b id="good">0</b>GOOD</span>
+                <span><b id="miss">0</b>MISS</span>
+              </div>
+            </section>
+          </aside>
+        </section>
+      </section>
+
+      <aside class="tool-rail rail-right" aria-label="帮助与记录">
+        <button type="button" data-open="rulesDrawer"><i>?</i><span>玩法</span></button>
+        <button type="button" data-open="recordsDrawer"><i>♛</i><span>记录</span></button>
+      </aside>
+    </section>
+
+    <div class="drawer-backdrop" id="drawerBackdrop"></div>
+
+    <aside class="drawer drawer-left" id="tracksDrawer" aria-hidden="true">
+      <header>
+        <div><small>SELECT TRACK</small><h2 id="songTitle">挑战曲库</h2></div>
+        <button type="button" data-close aria-label="关闭">×</button>
+      </header>
+      <p class="drawer-lead">选择歌曲后会先完成音频缓存，再开放挑战。</p>
+      <div class="song-list" id="songList"></div>
+    </aside>
+
+    <aside class="drawer drawer-left" id="difficultyDrawer" aria-hidden="true">
+      <header>
+        <div><small>INTENSITY</small><h2>选择难度</h2></div>
+        <button type="button" data-close aria-label="关闭">×</button>
+      </header>
+      <p class="drawer-lead">三档强度已整体上调。高难度包含加密节拍与双键和弦。</p>
+      <div class="difficulty-options">
+        <button class="on" type="button" data-diff="0">
+          <i>05</i><span><b>进阶</b><small>原高能密度 · 宽容判定</small></span><em>平均 1.8–2.2</em>
+        </button>
+        <button type="button" data-diff="1">
+          <i>08</i><span><b>高能</b><small>加密节拍 · 偶发双押</small></span><em>平均 2.6–3.1</em>
+        </button>
+        <button type="button" data-diff="2">
+          <i>11</i><span><b>鬼畜</b><small>高速下落 · 高频双押</small></span><em>平均 3.6–4.2</em>
+        </button>
+      </div>
+      <div class="difficulty-note">
+        <span>判定提示</span>
+        <p><b>PERFECT</b> 以当前等级判定窗为准；鬼畜模式需要约 ±45ms 精度。</p>
+      </div>
+    </aside>
+
+    <aside class="drawer drawer-right" id="rulesDrawer" aria-hidden="true">
+      <header>
+        <div><small>HOW TO PLAY</small><h2>挑战说明</h2></div>
+        <button type="button" data-close aria-label="关闭">×</button>
+      </header>
+      <div class="rules-grid">
+        <article><i>01</i><div><b>四轨接梗</b><p>桌面使用 D、F、J、K；手机直接点击对应轨道。</p></div></article>
+        <article><i>02</i><div><b>看准判定线</b><p>音符中心抵达发光横线时按下，偏差会显示 EARLY 或 LATE。</p></div></article>
+        <article><i>03</i><div><b>双键和弦</b><p>同一高度出现两个音符时，需要同时按下两条轨道。</p></div></article>
+        <article><i>04</i><div><b>连击增益</b><p>连续命中可提高分数，并在 10、25、50 连击触发反馈。</p></div></article>
+      </div>
+      <div class="notice-box">
+        <b>注意事项</b>
+        <ul>
+          <li>首次选歌需等待资源显示 READY 后才能开始。</li>
+          <li>切到后台会自动暂停，返回后点击继续。</li>
+          <li>佩戴耳机可获得更稳定的节奏判断。</li>
+          <li>按 P 暂停；在侧栏查看内容时游戏也会自动暂停。</li>
+        </ul>
+      </div>
+    </aside>
+
+    <aside class="drawer drawer-right" id="recordsDrawer" aria-hidden="true">
+      <header>
+        <div><small>LOCAL RECORDS</small><h2>本机纪录</h2></div>
+        <button type="button" data-close aria-label="关闭">×</button>
+      </header>
+      <p class="drawer-lead">每首歌曲、每档难度独立保存最高分。</p>
+      <div class="records-list" id="recordsList"></div>
+      <div class="record-tip">纪录保存在当前浏览器中，清理站点数据后会重置。</div>
+    </aside>
+  </main>
+
+  <audio id="music" preload="auto" playsinline></audio>
+  <script src="songs.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>
